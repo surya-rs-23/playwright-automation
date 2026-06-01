@@ -1,30 +1,24 @@
-import { Page, Locator } from '@playwright/test';
+import { Locator, Page } from '@playwright/test';
+import { BasePage } from './BasePage';
 
-export class OrdersPage {
-  readonly page: Page;
+export class OrdersPage extends BasePage {
   readonly ordersLink: Locator;
   readonly executedTab: Locator;
   readonly rejectedTab: Locator;
 
   constructor(page: Page) {
-    this.page = page;
+    super(page);
     this.ordersLink = page.getByRole('link', { name: 'Orders' });
     this.executedTab = page.getByText('Executed', { exact: true });
-    this.rejectedTab = page.getByText('Rejected0');
+    this.rejectedTab = page.getByText('Rejected', { exact: true });
   }
 
-  /**
-   * Navigates to the Orders section.
-   */
   async navigateToOrders() {
-    await this.ordersLink.click();
+    await this.click(this.ordersLink);
   }
 
-  /**
-   * Clicks/verifies both Executed and Rejected tabs as in the original recording.
-   */
   async verifyExecutedAndRejectedOrders() {
-    await this.executedTab.click();
-    await this.rejectedTab.click();
+    await this.click(this.executedTab);
+    await this.click(this.rejectedTab);
   }
 }
