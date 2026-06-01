@@ -56,7 +56,7 @@ export class OrdersPage extends BasePage {
     };
   }): Promise<void> {
     // 1. Navigate to the chart panel where the buy widget resides relative to baseURL
-    await this.navigate('/home/chart');
+    await this.navigate('home/chart');
 
     // 2. Define locators cleanly using standard Playwright selectors
     const buyPanelTrigger = this.page.getByRole('button', { name: 'Buy' });

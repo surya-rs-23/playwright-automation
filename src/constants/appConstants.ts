@@ -3,9 +3,9 @@
  * Keeping these separate makes it extremely easy to update global values (like routes and timeouts) in one place.
  */
 export const APP_ROUTES = {
-  LOGIN: '/login',
-  WATCHLIST: '/watchlist', // Example, if we ever navigate directly
-  ORDERS: '/orders',
+  LOGIN: '',
+  WATCHLIST: 'watchlist', // Example, if we ever navigate directly
+  ORDERS: 'orders',
 } as const;
 
 export const TIMEOUTS = {

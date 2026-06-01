@@ -21,7 +21,7 @@ export class WatchlistPage extends BasePage {
 
   constructor(page: Page) {
     super(page);
-    this.watchlistLink = page.getByRole('link', { name: 'Watchlist' });
+    this.watchlistLink = page.getByText('Watchlist', { exact: true }).first();
     this.settingsIcon = page.locator('#settings-icon').getByRole('img');
     this.createWatchlistBtn = page.getByRole('button', { name: 'Create Watchlist' });
     this.renameInput = page.locator('#rename-input');
@@ -56,6 +56,8 @@ export class WatchlistPage extends BasePage {
    * Navigates to the Watchlist tab.
    */
   async navigateToWatchlist(): Promise<void> {
+    await this.page.waitForLoadState('networkidle');
+    await this.waitForState(this.watchlistLink, 'visible', 20000);
     await this.click(this.watchlistLink);
   }
 
