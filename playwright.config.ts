@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './tests/specs',
+  testDir: './tests',
   timeout: 60000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -12,7 +12,7 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
   ],
   use: {
-    baseURL: 'https://api.cse.com.sa/oms-channel',
+    baseURL: 'https://api.cse.com.sa/oms-channel/',
     actionTimeout: 15000,
     navigationTimeout: 30000,
     screenshot: 'only-on-failure',
@@ -25,13 +25,13 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+    // {
+    //name: 'firefox',
+    // use: { ...devices['Desktop Firefox'] },
+    //  },
+    //   {
+    //  name: 'webkit',
+    // use: { ...devices['Desktop Safari'] },
+    //   },
   ],
 });
