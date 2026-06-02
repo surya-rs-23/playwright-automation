@@ -1,172 +1,113 @@
 import { Locator, Page } from '@playwright/test';
 import { BasePage } from './BasePage';
+import { TIMEOUTS } from '../constants/appConstants';
 
 /**
- * Page Object representing the Watchlist management page.
- * Provides APIs to create watchlists, search and add stocks, and execute buy orders.
+ * WatchlistPage manages all watchlist-related interactions.
+ * Handles navigation, creation, stock search, and stock management.
  */
 export class WatchlistPage extends BasePage {
-  // Encapsulated UI locators
-  private readonly watchlistLink: Locator;
-  private readonly settingsIcon: Locator;
-  private readonly createWatchlistBtn: Locator;
-  private readonly renameInput: Locator;
-  private readonly saveBtn: Locator;
-  private readonly searchInput: Locator;
-  private readonly buyImg: Locator;
-  private readonly combobox: Locator;
-  private readonly buyBtn: Locator;
-  private readonly imgNth3: Locator;
-  private readonly limitLabel: Locator;
+  // Main navigation & structure
+  private readonly watchlistNavLink: Locator;
+  private readonly watchlistContainer: Locator;
+  private readonly watchlistsGrid: Locator;
+
+  // Create watchlist modal
+  private readonly createWatchlistButton: Locator;
+  private readonly watchlistNameInput: Locator;
+  private readonly saveWatchlistButton: Locator;
+
+  // Search & stock management
+  private readonly stockSearchInput: Locator;
+  private readonly buyButton: Locator;
 
   constructor(page: Page) {
     super(page);
-    this.watchlistLink = page.getByText('Watchlist', { exact: true }).first();
-    this.settingsIcon = page.locator('#settings-icon').getByRole('img');
-    this.createWatchlistBtn = page.getByRole('button', { name: 'Create Watchlist' });
-    this.renameInput = page.locator('#rename-input');
-    this.saveBtn = page.getByRole('button', { name: 'Save' });
-    this.searchInput = page.getByRole('textbox', { name: 'Search eg: Saudi Aramco' });
-    
-    // Legacy generic locators maintained for backward compatibility
-    this.buyImg = page.locator('.absolute.right-3 > div > img').filter({ visible: true }).first();
-    this.combobox = page.getByRole('combobox').filter({ visible: true }).first();
-    this.buyBtn = page.getByRole('button', { name: 'Buy' });
-    this.imgNth3 = page.locator('img').filter({ visible: true }).nth(3);
-    this.limitLabel = page.locator('label').filter({ hasText: 'Limit' });
+    // Navigation
+    this.watchlistNavLink = page.getByRole('link', { name: /^watchlist$/i });
+    this.watchlistContainer = page.locator('[class*="watchlist"], div').filter({ hasText: /watchlist/i }).first();
+    this.watchlistsGrid = page.locator('[class*="grid"], [class*="list"]').filter({ hasText: /retail|watchlist/i }).first();
+
+    // Create watchlist
+    this.createWatchlistButton = page.getByRole('button', { name: /create watchlist|add watchlist|create new/i }).first();
+    this.watchlistNameInput = page.locator('input[name*="name"], input[placeholder*="watchlist"], input[placeholder*="Watchlist"]').first();
+    this.saveWatchlistButton = page.getByRole('button', { name: /^save$/i }).first();
+
+    // Stock search
+    this.stockSearchInput = page.getByPlaceholder(/search|search eg/i);
+    this.buyButton = page.getByRole('button', { name: /^buy$/i }).last();
   }
 
   /**
-   * Helper to retrieve a table or block row containing the specified stock.
-   * Parameterizing this locator makes it robust against dynamic DOM lists.
-   */
-  private getStockRow(stockSymbol: string): Locator {
-    return this.page.locator('table tr, div, li').filter({ hasText: stockSymbol }).first();
-  }
-
-  /**
-   * Helper to identify the Buy Action image/button within a specific stock row.
-   * Eliminates the fragile nth(3) or first() selector indexing.
-   */
-  private getBuyButtonInRow(rowLocator: Locator): Locator {
-    return rowLocator.locator('img, button').filter({ visible: true }).first();
-  }
-
-  /**
-   * Navigates to the Watchlist tab.
+   * Navigate to the watchlist section from the main menu.
    */
   async navigateToWatchlist(): Promise<void> {
-    await this.page.waitForLoadState('networkidle');
-    await this.waitForState(this.watchlistLink, 'visible', 20000);
-    await this.click(this.watchlistLink);
+    await this.waitForState(this.watchlistNavLink, 'visible', TIMEOUTS.ACTION_TIMEOUT);
+    await this.click(this.watchlistNavLink);
+    await this.waitForState(this.watchlistContainer, 'visible', TIMEOUTS.NAVIGATION_TIMEOUT);
   }
 
   /**
-   * Creates a new watchlist by name.
-   * Replaced static sleep (waitForTimeout) with a state wait checking for modal save button to close.
+   * Create a new watchlist with the given name.
    */
   async createWatchlist(name: string): Promise<void> {
     await this.navigateToWatchlist();
-    await this.click(this.settingsIcon);
-    await this.click(this.createWatchlistBtn);
-    await this.fill(this.renameInput, name);
-    await this.click(this.saveBtn);
-
-    // Dynamic wait: Wait for the save button to disappear (signaling modal closure)
-    await this.waitForState(this.saveBtn, 'hidden');
+    await this.waitForState(this.createWatchlistButton, 'visible', TIMEOUTS.ACTION_TIMEOUT);
+    await this.click(this.createWatchlistButton);
+    await this.fill(this.watchlistNameInput, name);
+    await this.click(this.saveWatchlistButton);
   }
 
   /**
-   * Searches for a stock and adds it to the watchlist.
-   * Parameterizes the stock search queries and the target display name.
-   * 
-   * @param query The search text (e.g., '1' or stock code)
-   * @param stockDisplayName The target option name to select (e.g., 'SAIB - Saudi Investment Bank')
+   * Verify that a watchlist was created by looking for its name in the UI.
    */
-  async searchAndAddStock(query: string, stockDisplayName: string): Promise<void> {
-    // Clear and type cleanly using sequenced typing to prevent front-end search race conditions
-    await this.click(this.searchInput);
-    await this.searchInput.clear();
-    await this.type(this.searchInput, query);
-
-    // Locate the search result row dynamically based on the display name
-    const resultRow = this.page.locator('div, span, li')
-      .filter({ hasText: stockDisplayName })
-      .filter({ visible: true })
-      .first();
-
-    // Wait for the result row to appear dynamically (no arbitrary timeout needed)
-    await this.waitForState(resultRow, 'visible');
-
-    // Click the "+" add icon inside the row.
-    // If a direct child selector isn't possible, we use a clean wrapper method.
-    await this.clickAddButtonOnRow(resultRow);
-
-    // Wait for the stock to be successfully added to the active watchlist table
-    const tableRow = this.getStockRow(query);
-    await this.waitForState(tableRow, 'visible');
+  async verifyWatchlistCreated(name: string): Promise<void> {
+    const watchlistItem = this.page.locator('text=' + name).or(this.page.getByText(name));
+    await this.waitForState(watchlistItem, 'visible', TIMEOUTS.LONG_WAIT);
   }
 
   /**
-   * Helper to click the add action (typically on the far right of the row).
-   * Uses bounding box coordinates if no direct class/element is available, but encapsulates it cleanly.
+   * Search for a stock by query string.
    */
-  private async clickAddButtonOnRow(rowLocator: Locator): Promise<void> {
-    const box = await rowLocator.boundingBox();
-    if (box) {
-      // Click at the far right offset (width - 25px) where the add button/icon sits
-      await rowLocator.click({ position: { x: box.width - 25, y: box.height / 2 } });
-    } else {
-      await rowLocator.click();
-    }
+  async searchStock(query: string): Promise<void> {
+    await this.click(this.stockSearchInput);
+    await this.stockSearchInput.clear();
+    await this.fill(this.stockSearchInput, query);
+    // Allow time for search results to load
+    await this.page.waitForTimeout(500);
   }
 
   /**
-   * Executes a Market Buy order for the first available stock item using a given account.
+   * Add a stock to the watchlist by clicking its add/buy button in search results.
    */
-  async buyStockWithAccount(accountName: string): Promise<void> {
-    await this.click(this.buyImg);
-    await this.click(this.combobox);
+  async addStockToWatchlist(stockDisplayName: string): Promise<void> {
+    // Find the stock row by its display name
+    const stockRow = this.page.locator('text=' + stockDisplayName).or(this.page.getByText(stockDisplayName)).first();
+    await this.waitForState(stockRow, 'visible', TIMEOUTS.LONG_WAIT);
 
-    const accountOption = this.page.getByRole('option', { name: accountName });
-    await this.click(accountOption);
-    await this.click(this.buyBtn);
+    // Find and click the add button within or near the stock row
+    const addButton = stockRow.locator('.. [role="button"]').filter({ hasText: /add|buy/i }).first()
+      .or(this.page.getByRole('button', { name: /add/i }).first());
+    await this.click(addButton);
   }
 
   /**
-   * Executes a Limit Buy order for a specific stock in the watchlist by switching accounts.
-   * Uses robust row-based selection instead of brittle nth(3) indexing.
-   * 
-   * @param stockSymbol The code/identifier of the stock row (e.g. defaultStockQuery)
-   * @param tempAccount The initial account name to select
-   * @param targetAccount The target account name to confirm
+   * Verify that a stock was added to the watchlist.
    */
-  async buyLimitStockWithSwitch(stockSymbol: string, tempAccount: string, targetAccount: string): Promise<void> {
-    await this.navigateToWatchlist();
+  async verifyStockAdded(symbol: string): Promise<void> {
+    const stockSymbol = this.page.locator('text=' + symbol).or(this.page.getByText(symbol));
+    await this.waitForState(stockSymbol, 'visible', TIMEOUTS.LONG_WAIT);
+  }
 
-    // Find the row for this specific stock dynamically
-    const stockRow = this.getStockRow(stockSymbol);
-    const buyButton = this.getBuyButtonInRow(stockRow);
+  /**
+   * Open the buy panel for a specific stock symbol in the watchlist.
+   */
+  async openBuyPanelForStock(symbol: string): Promise<void> {
+    const stockRow = this.page.locator('text=' + symbol).or(this.page.getByText(symbol)).first();
+    await this.waitForState(stockRow, 'visible', TIMEOUTS.ACTION_TIMEOUT);
+    await this.click(stockRow);
 
-    // If stock row doesn't resolve dynamically, fall back to legacy image click to maintain compatibility
-    if (await buyButton.isVisible()) {
-      await this.click(buyButton);
-    } else {
-      await this.click(this.imgNth3);
-    }
-
-    await this.click(this.combobox);
-
-    // Select the temporary account option
-    const tempOpt = this.page.getByText(tempAccount, { exact: true });
-    await this.click(tempOpt);
-
-    // Re-open and select the target account option
-    await this.click(this.combobox);
-    const targetOpt = this.page.getByRole('option', { name: targetAccount });
-    await this.click(targetOpt);
-
-    await this.click(this.limitLabel);
-    await this.click(this.buyBtn);
+    // Wait for buy button to be visible
+    await this.waitForState(this.buyButton, 'visible', TIMEOUTS.ACTION_TIMEOUT);
   }
 }
